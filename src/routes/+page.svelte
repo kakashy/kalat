@@ -2,19 +2,21 @@
 	import { toast } from 'svelte-sonner';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { fly } from 'svelte/transition';
-	import { fetchKalas, saveColor } from '$lib/utils/db';
+	import { deleteColor, fetchKalas, saveColor } from '$lib/utils/db';
 	import { onMount } from 'svelte';
 	import type { AllIDBKalas } from '$lib/types';
 	import { getTextColor, sortColorsByHue } from '$lib/utils/colors';
 	import { debounce } from '$lib';
 	import { debouncedColor } from '$lib/stores';
+	import Separator from '$lib/components/ui/separator/separator.svelte';
 	let kala: string;
+	let lastSavedKala: string;
 	$: debouncedUpdate(kala);
 	let kalas: AllIDBKalas;
 
 	const debouncedUpdate = debounce((color: string) => {
 		debouncedColor.set(color);
-	}, 300);
+	}, 200);
 
 	onMount(async () => {
 		const { docs } = await fetchKalas();
@@ -26,6 +28,7 @@
 		toast.promise(saveColor(kala), {
 			loading: 'Saving this color locally',
 			success: (d) => {
+				lastSavedKala = kala;
 				fetchKalas().then(({ docs }) => {
 					kalas = sortColorsByHue(docs);
 				});
@@ -38,6 +41,22 @@
 				} else {
 					return 'Something went wrong';
 				}
+			}
+		});
+	}
+	async function handleDeleteColor() {
+		toast.promise(deleteColor(kala), {
+			loading: 'Deleting current color',
+			success: (d) => {
+				fetchKalas().then(({ docs }) => {
+					kalas = sortColorsByHue(docs);
+					kala = kalas.length > 0 ? kalas[0].id : '';
+					if (kala) lastSavedKala = kala;
+				});
+				return d.message;
+			},
+			error: (e) => {
+				return 'Something went wrong';
 			}
 		});
 	}
@@ -64,11 +83,21 @@
 			>
 				<span class="text-lg sm:text-2xl">{kala}</span>
 			</div>
-			<span in:fly={{ y: -20, duration: 400, delay: 300 }} class="ml-auto">
-				<Button on:click={handleSaveColor}>Save this color</Button>
-			</span>
+			<aside class="flex items-center justify-end gap-3">
+				{#if lastSavedKala === kala}
+					<span in:fly={{ y: -20, duration: 400, delay: 100 }}>
+						<Button on:click={handleDeleteColor} variant="destructive">Delete this color</Button>
+					</span>
+				{:else}
+					<span in:fly={{ y: -20, duration: 400, delay: 100 }}>
+						<Button on:click={handleSaveColor}>Save this color</Button>
+					</span>
+				{/if}
+			</aside>
 		{/if}
 	</aside>
+
+	<Separator class="mt-6" />
 
 	{#if kalas}
 		{#key kalas.length}
@@ -78,7 +107,10 @@
 			>
 				{#each kalas as k}
 					<Button
-						on:click={() => (kala = k.id)}
+						on:click={() => {
+							kala = k.id;
+							lastSavedKala = k.id;
+						}}
 						class="rounded-lg border p-5 shadow"
 						style="background-color: {k.id};"
 					>

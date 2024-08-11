@@ -45,6 +45,17 @@ export const saveColor = async (kalat: string) => {
 	}
 };
 
+export const deleteColor = async (kalat: string) => {
+	try {
+		const db = await getDb();
+		const doc = await db.get(kalat);
+		const { ok } = await db.remove(doc);
+		return { ok, status: 200, message: 'Color successfully removed.' };
+	} catch (e) {
+		return { ok: false, status: 500, message: e.message as string };
+	}
+};
+
 export const fetchKalas = async () => {
 	try {
 		const db = await getDb();
